@@ -2826,6 +2826,94 @@ func TestStateStore_RestoreJobSummary(t *testing.T) {
 	}
 }
 
+// TestStateStore_CSIVolume checks register, list and deregister for csi_volumes
+func TestStateStore_CSIVolume(t *testing.T) {
+	state := testStateStore(t)
+
+	v0 := structs.CreateCSIVolume(nil)
+	v0.ID = "DEADBEEF-70AD-4672-9178-802BCA500C87"
+	v0.MaxReaders = 2
+	v0.MaxWriters = 0
+	v0.Driver = "minnie"
+
+	v1 := structs.CreateCSIVolume(nil)
+	v1.ID = "BAADF00D-70AD-4672-9178-802BCA500C87"
+	v1.MaxReaders = 2
+	v1.MaxWriters = 0
+	v1.Driver = "adam"
+
+	err := state.CSIVolumeRegister(0, []*structs.CSIVolume{v0, v1})
+	require.NoError(t, err)
+
+	ws := memdb.NewWatchSet()
+	iter, err := state.CSIVolumes(ws)
+	require.NoError(t, err)
+
+	slurp := func(iter memdb.ResultIterator) (vs []*structs.CSIVolume) {
+		for {
+			raw := iter.Next()
+			if raw == nil {
+				break
+			}
+			vol := raw.(*structs.CSIVolume)
+			vs = append(vs, vol)
+		}
+		return vs
+	}
+
+	vs := slurp(iter)
+	require.Equal(t, 2, len(vs))
+
+	ws = memdb.NewWatchSet()
+	iter, err = state.CSIVolumesByDriver(ws, "minnie")
+	require.NoError(t, err)
+	vs = slurp(iter)
+	require.Equal(t, 1, len(vs))
+
+	err = state.CSIVolumeDeregister(1, []string{
+		"BAADF00D-70AD-4672-9178-802BCA500C87",
+	})
+	require.NoError(t, err)
+
+	ws = memdb.NewWatchSet()
+	iter, err = state.CSIVolumesByDriver(ws, "adam")
+	require.NoError(t, err)
+	vs = slurp(iter)
+	require.Equal(t, 0, len(vs))
+
+	ws = memdb.NewWatchSet()
+	iter, err = state.CSIVolumes(ws)
+	require.NoError(t, err)
+	vs = slurp(iter)
+	require.Equal(t, 1, len(vs))
+
+	// Claims
+	a0 := &structs.Allocation{ID: "al"}
+	a1 := &structs.Allocation{ID: "gator"}
+	r := structs.CSIVolumeClaimRead
+	// w := structs.CSIVolumeClaimWrite
+	u := structs.CSIVolumeClaimRelease
+
+	err = state.CSIVolumeClaim(2, "DEADBEEF-70AD-4672-9178-802BCA500C87", a0, r)
+	require.NoError(t, err)
+	err = state.CSIVolumeClaim(2, "DEADBEEF-70AD-4672-9178-802BCA500C87", a1, r)
+	require.NoError(t, err)
+
+	ws = memdb.NewWatchSet()
+	iter, err = state.CSIVolumesByDriver(ws, "minnie")
+	require.NoError(t, err)
+	vs = slurp(iter)
+	require.False(t, vs[0].CanReadOnly())
+
+	err = state.CSIVolumeClaim(2, "DEADBEEF-70AD-4672-9178-802BCA500C87", a0, u)
+	require.NoError(t, err)
+	ws = memdb.NewWatchSet()
+	iter, err = state.CSIVolumesByDriver(ws, "minnie")
+	require.NoError(t, err)
+	vs = slurp(iter)
+	require.True(t, vs[0].CanReadOnly())
+}
+
 func TestStateStore_Indexes(t *testing.T) {
 	t.Parallel()
 
