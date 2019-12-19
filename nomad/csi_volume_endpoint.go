@@ -58,7 +58,7 @@ func (srv *Server) WriteACLObj(args *structs.WriteRequest) (*acl.ACL, error) {
 }
 
 // replyCSIVolumeIndex sets the reply with the last index that modified the table csi_volumes
-func (srv *Server) replyCSIVolumeIndex(state *state.StateStore, reply *structs.QueryMeta) error {
+func (srv *Server) replySetCSIVolumeIndex(state *state.StateStore, reply *structs.QueryMeta) error {
 	// Use the last index that affected the table
 	index, err := state.Index("csi_volumes")
 	if err != nil {
