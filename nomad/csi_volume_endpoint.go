@@ -1,6 +1,7 @@
 package nomad
 
 import (
+	"fmt"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -22,6 +23,10 @@ type CSIVolume struct {
 // QueryACLObj looks up the ACL token in the request and returns the acl.ACL object
 // - fallback to node secret ids
 func (srv *Server) QueryACLObj(args *structs.QueryOptions) (*acl.ACL, error) {
+	if args.AuthToken == "" {
+		return nil, fmt.Errorf("authorization required")
+	}
+
 	// Lookup the token
 	aclObj, err := srv.ResolveToken(args.AuthToken)
 	if err != nil {
