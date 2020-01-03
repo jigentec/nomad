@@ -112,11 +112,12 @@ func (v *CSIVolume) List(args *structs.CSIVolumeListRequest, reply *structs.CSIV
 				}
 				vol := raw.(*structs.CSIVolume)
 
+				// Filter on the request namespace to avoid ACL checks by volume
 				if args.RequestNamespace() != "" && vol.Namespace != args.RequestNamespace() {
 					continue
 				}
 
-				// Cache acl checks, QUESTION: are they expensive
+				// Cache ACL checks QUESTION: are they expensive?
 				allowed, ok := cache[vol.Namespace]
 				if !ok {
 					allowed = aclObj.AllowNsOp(vol.Namespace, acl.NamespaceCapabilityCSIAccess)
@@ -144,6 +145,10 @@ func (v *CSIVolume) Get(args *structs.CSIVolumeGetRequest, reply *structs.CSIVol
 		return err
 	}
 
+	if !aclObj.AllowNsOp(args.RequestNamespace(), acl.NamespaceCapabilityCSIAccess) {
+		return structs.ErrPermissionDenied
+	}
+
 	metricsStart := time.Now()
 	defer metrics.MeasureSince([]string{"nomad", "volume", "get"}, metricsStart)
 
@@ -156,8 +161,8 @@ func (v *CSIVolume) Get(args *structs.CSIVolumeGetRequest, reply *structs.CSIVol
 				return err
 			}
 
-			if !aclObj.AllowNsOp(vol.Namespace, acl.NamespaceCapabilityCSIAccess) {
-				return structs.ErrPermissionDenied
+			if vol == nil || vol.Namespace != args.RequestNamespace() {
+				return structs.ErrMissingCSIVolumeID
 			}
 
 			reply.Volume = vol

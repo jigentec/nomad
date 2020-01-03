@@ -101,7 +101,6 @@ func TestCSIVolumeEndpoint_Register(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, 0, resp1.Index)
 
-	// ==============================
 	// Get the volume back out
 	policy = mock.NamespacePolicy(ns, "", []string{acl.NamespaceCapabilityCSIAccess})
 	getToken := mock.CreatePolicyAndToken(t, state, 1001, "csi-access", policy)
@@ -119,30 +118,27 @@ func TestCSIVolumeEndpoint_Register(t *testing.T) {
 	require.NotEqual(t, 0, resp2.Index)
 	require.Equal(t, vols[0].ID, resp2.Volume.ID)
 
-	// ==============================
 	// Registration does not update
 	req1.Volumes[0].Driver = "adam"
 	err = msgpackrpc.CallWithCodec(codec, "CSIVolume.Register", req1, resp1)
 	require.Error(t, err, "exists")
 
-	// ==============================
 	// Deregistration works
-	/*	req3 := &structs.CSIVolumeDeregisterRequest{
-			VolumeIDs: []string{"DEADBEEF-70AD-4672-9178-802BCA500C87"},
-			WriteRequest: structs.WriteRequest{
-				Namespace: ns,
-				AuthToken: validToken.SecretID,
-			},
-		}
-		resp3 := &structs.CSIVolumeDeregisterResponse{}
-		err = msgpackrpc.CallWithCodec(codec, "CSIVolume.Deregister", req3, resp3)
-		require.NoError(t, err)
+	req3 := &structs.CSIVolumeDeregisterRequest{
+		VolumeIDs: []string{"DEADBEEF-70AD-4672-9178-802BCA500C87"},
+		WriteRequest: structs.WriteRequest{
+			Region:    "global",
+			Namespace: ns,
+			AuthToken: validToken.SecretID,
+		},
+	}
+	resp3 := &structs.CSIVolumeDeregisterResponse{}
+	err = msgpackrpc.CallWithCodec(codec, "CSIVolume.Deregister", req3, resp3)
+	require.NoError(t, err)
 
-		// ==============================
-		// Volume is missing
-		err = msgpackrpc.CallWithCodec(codec, "CSIVolume.Get", req2, resp2)
-		require.Error(t, err, "missing")
-	*/
+	// Volume is missing
+	err = msgpackrpc.CallWithCodec(codec, "CSIVolume.Get", req2, resp2)
+	require.Error(t, err, "missing")
 }
 
 func TestCSIVolumeEndpoint_List(t *testing.T) {
